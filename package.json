@@ -1,0 +1,17 @@
+{
+  "name": "jingjing-study",
+  "version": "1.0.0",
+  "description": "鲸鲸学习 · 高中生成绩记录、成绩曲线、提分分析与错题订正助手",
+  "private": true,
+  "scripts": {
+    "sync": "cap sync android",
+    "copy": "cap copy android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0"
+  }
+}

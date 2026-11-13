@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f6f7fb">
+<title>鲸鲸学习 · 成绩与错题助手</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="tb-title" id="tb-title">首页</div>
+  <div class="tb-actions" id="tb-actions"></div>
+</header>
+
+<main id="pages">
+  <!-- ============ 首页 ============ -->
+  <section class="page active" id="page-home">
+    <div class="hero">
+      <div class="hero-top">
+        <div class="hero-greet" id="home-greet">Hi，同学</div>
+        <button class="icon-btn" id="btn-theme" aria-label="切换主题">☾</button>
+      </div>
+      <div class="hero-count" id="home-countdown">设置下次考试后显示倒计时</div>
+      <div class="hero-chips" id="home-chips"></div>
+    </div>
+
+    <div class="card" id="home-today">
+      <div class="card-head">
+        <div class="card-title">今日任务</div>
+        <button class="link-btn" data-nav="mistakes">全部 ›</button>
+      </div>
+      <div class="today-body" id="home-today-body"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card tap" data-nav="scores">
+        <div class="mini-label">最近考试</div>
+        <div class="mini-big" id="home-last-exam">暂无</div>
+        <div class="mini-sub" id="home-last-sub"></div>
+      </div>
+      <div class="card tap" data-nav="analysis">
+        <div class="mini-label">本周复习</div>
+        <div class="mini-big" id="home-review-count">0</div>
+        <div class="mini-sub">已订正错题</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title">成绩走势</div><button class="link-btn" data-nav="scores">详情 ›</button></div>
+      <div class="chart-box" id="home-chart"></div>
+    </div>
+
+    <div class="quick-row" id="home-quick"></div>
+  </section>
+
+  <!-- ============ 成绩 ============ -->
+  <section class="page" id="page-scores">
+    <div class="seg" id="scores-seg">
+      <button class="seg-btn active" data-v="overview">总览</button>
+      <button class="seg-btn" data-v="list">考试记录</button>
+    </div>
+    <div class="subpage active" id="scores-overview">
+      <div class="card">
+        <div class="card-head"><div class="card-title">总分 / 排名曲线</div></div>
+        <div class="chart-box" id="scores-total-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">单科曲线</div>
+          <div class="chip-row" id="scores-subject-pick"></div>
+        </div>
+        <div class="chart-box" id="scores-subject-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title">各科现状</div></div>
+        <div id="scores-subject-cards"></div>
+      </div>
+    </div>
+    <div class="subpage" id="scores-list">
+      <button class="btn primary block" id="btn-add-exam">＋ 添加考试 / 导入成绩</button>
+      <div id="exam-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ 错题 ============ -->
+  <section class="page" id="page-mistakes">
+    <div class="seg" id="mistakes-seg">
+      <button class="seg-btn active" data-v="book">错题本</button>
+      <button class="seg-btn" data-v="practice">举一反三</button>
+      <button class="seg-btn" data-v="review">待复习<span class="dot" id="review-dot" hidden></span></button>
+    </div>
+    <div class="subpage active" id="mistakes-book">
+      <div class="filter-row" id="mistake-filters"></div>
+      <div id="mistake-list"></div>
+      <button class="btn fab" id="btn-add-mistake">＋</button>
+    </div>
+    <div class="subpage" id="mistakes-practice">
+      <div class="card">
+        <div class="card-head"><div class="card-title">举一反三练习</div></div>
+        <p class="muted">根据你记录的错题知识点生成同类题，巩固薄弱环节。</p>
+        <div id="practice-tip" class="muted" style="color:var(--accent)"></div>
+        <div id="practice-gen-list"></div>
+        <button class="btn primary block" id="btn-practice-random">随机来一题</button>
+        <div class="practice-area" id="practice-area" hidden></div>
+      </div>
+    </div>
+    <div class="subpage" id="mistakes-review">
+      <div class="card">
+        <div class="card-head"><div class="card-title">按遗忘曲线待复习</div></div>
+        <p class="muted">订正后第 1 / 2 / 4 / 7 / 15 天自动安排重做，答对进阶、答错重来。</p>
+        <div id="review-queue"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 分析 ============ -->
+  <section class="page" id="page-analysis">
+    <div class="card">
+      <div class="card-head"><div class="card-title">提分点分析</div></div>
+      <div id="gain-points"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">常错题型分布</div></div>
+      <div id="analysis-type-pick"></div>
+      <div class="chart-box" id="analysis-type-chart"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">学科健康度</div></div>
+      <div id="subject-health"></div>
+    </div>
+  </section>
+
+  <!-- ============ 我的 ============ -->
+  <section class="page" id="page-me">
+    <div class="card">
+      <div class="card-head"><div class="card-title">个人设置</div></div>
+      <label class="field"><span>姓名 / 昵称</span><input id="set-name" placeholder="同学"></label>
+      <label class="field"><span>年级</span><input id="set-grade" placeholder="如：高一"></label>
+      <label class="field"><span>下次考试</span><input id="set-exam-name" placeholder="如：期中考试"></label>
+      <label class="field"><span>考试日期</span><input id="set-exam-date" type="date"></label>
+      <label class="field"><span>目标总分</span><input id="set-target-total" type="number" placeholder="选填"></label>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">我的科目</div></div>
+      <div id="subject-manage"></div>
+      <button class="btn ghost block" id="btn-add-subject">＋ 添加科目</button>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">数据</div></div>
+      <button class="btn ghost block" id="btn-export">导出备份 (JSON)</button>
+      <button class="btn ghost block" id="btn-import">导入备份</button>
+      <input type="file" id="import-file" accept="application/json" hidden>
+      <button class="btn ghost block" id="btn-demo">填入示例数据（体验用）</button>
+      <button class="btn ghost danger block" id="btn-reset">清空全部数据</button>
+    </div>
+    <div class="about">鲸鲸学习 · 数据只保存在你手机本地</div>
+  </section>
+</main>
+
+<nav id="tabbar">
+  <button class="tab active" data-page="home"><span class="tab-ic">⌂</span><span>首页</span></button>
+  <button class="tab" data-page="scores"><span class="tab-ic">▥</span><span>成绩</span></button>
+  <button class="tab" data-page="mistakes"><span class="tab-ic">✎</span><span>错题</span></button>
+  <button class="tab" data-page="analysis"><span class="tab-ic">◈</span><span>分析</span></button>
+  <button class="tab" data-page="me"><span class="tab-ic">☺</span><span>我的</span></button>
+</nav>
+
+<div id="modal-root" hidden>
+  <div class="modal-mask"></div>
+  <div class="modal" id="modal-box"></div>
+</div>
+<div id="toast"></div>
+<input type="file" id="photo-input" accept="image/*" hidden>
+
+<script src="js/store.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/gen.js"></script>
+<script src="js/app.js"></script>
+<script>
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(()=>{}); }
+</script>
+</body>
+</html>

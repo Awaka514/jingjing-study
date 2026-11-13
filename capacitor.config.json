@@ -1,0 +1,8 @@
+{
+  "appId": "com.jingjing.study",
+  "appName": "鲸鲸学习",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
