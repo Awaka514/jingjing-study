@@ -398,14 +398,18 @@ function renderPractice(){
     const top = Object.entries(map).sort((a,b)=>b[1]-a[1])[0];
     if(top){ const t=Gen.byId(top[0]); const tip=$('#practice-tip'); if(tip) tip.textContent = `根据你的错题，建议先练「${t.name}」`; }
   }
+  // 保底：打开这个页面时先来一道题
+  if(!$('#practice-area').innerHTML.trim()){ newPractice('linear'); $('#practice-area').hidden = false; }
 }
 let curPractice = null;
 function startPractice(typeId){
   const t = Gen.byId(typeId);
   if(!t) return;
   newPractice(typeId);
-  $('#practice-area').hidden = false;
-  $('#practice-area').scrollIntoView({behavior:'smooth'});
+  const area = $('#practice-area');
+  area.hidden = false;
+  area.style.display = 'block';
+  area.scrollIntoView({behavior:'smooth', block:'center'});
 }
 function newPractice(typeId){
   const t = Gen.byId(typeId);
