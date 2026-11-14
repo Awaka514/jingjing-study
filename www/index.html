@@ -98,14 +98,11 @@
       <button class="btn fab" id="btn-add-mistake">＋</button>
     </div>
     <div class="subpage" id="mistakes-practice">
-      <div class="card">
-        <div class="card-head"><div class="card-title">举一反三练习</div></div>
-        <p class="muted">根据你记录的错题知识点生成同类题，巩固薄弱环节。</p>
-        <div id="practice-tip" class="muted" style="color:var(--accent)"></div>
-        <div id="practice-gen-list"></div>
-        <button class="btn primary block" id="btn-practice-random">随机来一题</button>
-        <div class="practice-area" id="practice-area" hidden></div>
-      </div>
+      <div id="practice-hero"></div>
+      <div class="search-row"><input id="practice-search" type="search" placeholder="搜知识点或题型，如「对数」「受力」"></div>
+      <div class="type-filter" id="practice-filter"></div>
+      <div id="practice-type-list"></div>
+      <div class="practice-sheet" id="practice-area" hidden></div>
     </div>
     <div class="subpage" id="mistakes-review">
       <div class="card">
@@ -177,6 +174,7 @@
 
 <script src="js/store.js"></script>
 <script src="js/charts.js"></script>
+<script src="js/types.js"></script>
 <script src="js/gen.js"></script>
 <script src="js/app.js"></script>
 <script>

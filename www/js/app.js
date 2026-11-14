@@ -86,12 +86,15 @@ function renderHome(){
   $('#home-greet').textContent = `${greet}，${s.profile.name||'同学'}`;
   // 倒计时
   const d = s.profile.examDate;
-  let cd = '设置下次考试后显示倒计时';
+  let cd;
   if(d){
     const days = Math.ceil((new Date(d+'T00:00') - new Date())/86400000);
-    if(days>0) cd = `${s.profile.examName||'考试'} · 还有 <b>${days}</b> 天`;
-    else if(days===0) cd = `今天是${s.profile.examName||'考试'}，加油！`;
-    else cd = `${s.profile.examName||'考试'}已结束`;
+    const name = s.profile.examName||'考试';
+    if(days>0) cd = `<div class="cd-num">${days}<span>天</span></div><div class="cd-sub">距${esc(name)}</div>`;
+    else if(days===0) cd = `<div class="cd-num">今天</div><div class="cd-sub">${esc(name)}，加油</div>`;
+    else cd = `<div class="cd-num">已结束</div><div class="cd-sub">${esc(name)}</div>`;
+  } else {
+    cd = `<div class="cd-num dim">未设置</div><div class="cd-sub">去「我的」填下次考试，这里显示倒计时</div>`;
   }
   $('#home-countdown').innerHTML = cd;
   // chips
@@ -321,6 +324,10 @@ function renderMistakeBook(){
       if(act==='edit') openMistakeModal(m);
       if(act==='del'){ s.mistakes=s.mistakes.filter(x=>x.id!==id); Store.save(); renderMistakes(); }
       if(act==='view') previewPhoto(m.photoId);
+      if(act==='practice'){
+        const t = QBank.match(m.knowledge, subjectName(m.subjectId))[0];
+        if(t) openType(t.id); else { toast('这类题暂时没有匹配的题型'); switchSeg('mistakes','practice'); }
+      }
     };
   });
   $('#mistake-list').querySelectorAll('img[data-act="view"]').forEach(el=>{ const m=s.mistakes.find(x=>x.id===el.dataset.id); if(m&&m.photoId) photoUrl(m.photoId).then(u=>{ if(u) el.src=u; }); });
@@ -338,6 +345,7 @@ function mistakeHTML(m){
     ${ph}
     <div class="mistake-actions">
       <button class="btn sm" data-act="edit" data-id="${m.id}">订正/编辑</button>
+      ${m.knowledge && QBank.match(m.knowledge, subjectName(m.subjectId)).length ? `<button class="btn sm" data-act="practice" data-id="${m.id}">练同类题</button>` : ''}
       <button class="btn sm danger" data-act="del" data-id="${m.id}">删除</button>
     </div></div>`;
 }
@@ -385,70 +393,131 @@ function openMistakeModal(mistake){
 }
 
 /* ---- 举一反三 ---- */
+let curTypeId = null, curIdx = -1, practiceFilter = '全部', showSteps = false, showAns = false;
+
 function renderPractice(){
   const s = S();
-  const tip = $('#practice-tip'); if(tip) tip.textContent = '';
-  $('#practice-gen-list').innerHTML = Gen.all().map(t=>`<button class="btn sm" style="margin:4px" data-gen="${t.id}">${esc(t.name)}</button>`).join('');
-  $('#practice-gen-list').querySelectorAll('[data-gen]').forEach(b=>b.onclick=()=>startPractice(b.dataset.gen));
-  // 按错题知识点推荐
-  const kws = s.mistakes.filter(m=>m.knowledge).map(m=>m.knowledge);
-  if(kws.length){
-    const map = {};
-    kws.forEach(k=>{ const gid=Gen.matchByKnowledge(k); if(gid) map[gid]=(map[gid]||0)+1; });
-    const top = Object.entries(map).sort((a,b)=>b[1]-a[1])[0];
-    if(top){ const t=Gen.byId(top[0]); const tip=$('#practice-tip'); if(tip) tip.textContent = `根据你的错题，建议先练「${t.name}」`; }
+  const rec = new Map();
+  (s.mistakes||[]).forEach(m=>{
+    if(!m.knowledge) return;
+    QBank.match(m.knowledge, subjectName(m.subjectId)).slice(0,2).forEach(t=>{
+      if(!rec.has(t.id)) rec.set(t.id, { t, items: [] });
+      rec.get(t.id).items.push(m);
+    });
+  });
+  const recArr = [...rec.values()].sort((a,b)=>b.items.length-a.items.length);
+  const hero = $('#practice-hero');
+  hero.innerHTML = recArr.length ? `<div class="rec-card">
+      <div class="rec-tag">根据你的错题推荐</div>
+      <div class="rec-title">${esc(recArr[0].t.title)}</div>
+      <div class="rec-sub">「${esc(recArr[0].items[0].knowledge)}」这类题你错过 ${recArr[0].items.length} 次</div>
+      <button class="btn primary sm" data-open="${recArr[0].t.id}">开始这一类 ›</button>
+    </div>` : `<div class="rec-card">
+      <div class="rec-tag">举一反三</div>
+      <div class="rec-title">还没有错题可以参照</div>
+      <div class="rec-sub">先在错题本录一道，这里会自动匹配同类题型</div>
+    </div>`;
+
+  const subs = ['全部', ...new Set(QBank.all().map(t=>t.subject))];
+  if(!subs.includes(practiceFilter)) practiceFilter = '全部';
+  const f = $('#practice-filter');
+  f.innerHTML = subs.map(v=>`<button class="chip ${v===practiceFilter?'active':''}" data-f="${v}">${v}</button>`).join('');
+  f.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ practiceFilter=b.dataset.f; renderPractice(); });
+  const se = $('#practice-search');
+  if(se && !se.dataset.bound){ se.dataset.bound='1'; se.addEventListener('input', ()=>renderPractice()); }
+
+  const list = $('#practice-type-list');
+  const q = ($('#practice-search')?.value || '').trim();
+  const hitQ = t => !q || [t.title,t.topic,t.why,...(t.keys||[])].join(' ').includes(q);
+  const groups = {};
+  QBank.all().filter(t=>(practiceFilter==='全部'||t.subject===practiceFilter) && hitQ(t))
+    .forEach(t=>{ (groups[t.subject]=groups[t.subject]||[]).push(t); });
+  if(q && !Object.keys(groups).length){
+    list.innerHTML = `<div class="empty"><div class="big">🔍</div>没有找到「${esc(q)}」相关的题型<br>换个关键词试试</div>`;
+    return;
   }
-  // 保底：打开这个页面时先来一道题
-  if(!$('#practice-area').innerHTML.trim()){ newPractice('linear'); $('#practice-area').hidden = false; }
+  list.innerHTML = Object.entries(groups).map(([sub,arr])=>`
+    <div class="type-group">
+      <div class="type-group-title">${esc(sub)}</div>
+      ${arr.map((t,i)=>{
+        const hit = rec.get(t.id);
+        return `<button class="type-card" data-open="${t.id}">
+          <div class="type-idx">${String(i+1).padStart(2,'0')}</div>
+          <div class="type-main">
+            <div class="type-card-top"><span class="type-name">${esc(t.title)}</span><span class="level">${'★'.repeat(t.level)}</span></div>
+            <div class="type-topic">${esc(t.topic)}</div>
+            <div class="type-why">${esc(t.why)}</div>
+            <div class="type-hit ${hit?'':'dim'}">${hit?`你的错题命中 ${hit.items.length} 道`:'含 2 道变式'}${practicedOf(t.id)?` · 练过 ${practicedOf(t.id)} 次`:''}</div>
+          </div>
+        </button>`;
+      }).join('')}
+    </div>`).join('');
+  list.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openType(b.dataset.open));
+  hero.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openType(b.dataset.open));
 }
-let curPractice = null;
-function startPractice(typeId){
-  const t = Gen.byId(typeId);
-  if(!t) return;
-  newPractice(typeId);
+
+function practicedOf(id){ const s=S(); return (s.practice && s.practice[id]) || 0; }
+function bumpPractice(id){
+  const s = S(); s.practice = s.practice || {};
+  s.practice[id] = (s.practice[id]||0) + 1; Store.save();
+}
+function openType(id){
+  curTypeId = id; curIdx = -1; showSteps = false; showAns = false;
+  bumpPractice(id);
+  switchSeg('mistakes','practice');
+  renderSheet();
+  const area = $('#practice-area');
+  if(area) area.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function renderSheet(){
+  const t = QBank.byId(curTypeId); if(!t) return;
+  const isV = curIdx >= 0;
+  const q = isV ? t.variants[curIdx].q : t.q;
+  const ans = isV ? t.variants[curIdx].ans : t.ans;
   const area = $('#practice-area');
   area.hidden = false;
-  area.style.display = 'block';
-  area.scrollIntoView({behavior:'smooth', block:'center'});
-}
-function newPractice(typeId){
-  const t = Gen.byId(typeId);
-  const p = t.gen();
-  curPractice = { typeId, p, t };
-  $('#practice-area').innerHTML = `
-    <div class="pq" style="white-space:nowrap;overflow-x:auto">${p.q}</div>
-    ${p.reveal?'':'<input class="panswer" id="pa-input" type="text" inputmode="text" placeholder="输入答案">'}
-    <div class="presult" id="pa-result"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${p.reveal?'':`<button class="btn primary sm" id="pa-check">检查</button>`}
-      <button class="btn sm" id="pa-hint">提示</button>
-      <button class="btn sm" id="pa-answer">看答案</button>
-      <button class="btn sm" id="pa-next">换一题</button>
+  const wrap = document.getElementById('mistakes-practice');
+  if(wrap) wrap.classList.add('sheet-mode');
+  area.innerHTML = `
+    <div class="sheet-head">
+      <div>
+        <div class="sheet-topic">${esc(t.subject)} · ${esc(t.topic)}</div>
+        <div class="sheet-title">${esc(t.title)}</div>
+      </div>
+      <button class="icon-btn" id="sheet-close">✕</button>
+    </div>
+    <div class="sheet-badge ${isV?'':'main'}">${isV?`变式 ${curIdx+1} / ${t.variants.length}`:'原题'}</div>
+    <div class="sheet-q">${q}</div>
+    ${showSteps?`<div class="sheet-block"><div class="block-label">解题思路</div><ol>${t.steps.map(x=>`<li>${x}</li>`).join('')}</ol></div>`:''}
+    ${showAns?`<div class="sheet-block ans"><div class="block-label">答案</div><div class="ans-text">${ans}</div></div>`:''}
+    <div class="sheet-actions">
+      <button class="btn sm" id="sheet-steps">${showSteps?'收起思路':'看思路'}</button>
+      <button class="btn sm" id="sheet-ans">${showAns?'收起答案':'看答案'}</button>
+      <button class="btn sm primary" id="sheet-next">${isV?(curIdx+1<t.variants.length?'下一道变式':'回到原题'):'做变式'}</button>
+    </div>
+    <div class="variant-row">
+      <button class="chip ${curIdx===-1?'active':''}" data-v="-1">原题</button>
+      ${t.variants.map((v,i)=>`<button class="chip ${curIdx===i?'active':''}" data-v="${i}">变式${i+1}</button>`).join('')}
     </div>`;
-  if(!p.reveal){ $('#pa-check').onclick=checkPractice; $('#pa-input').addEventListener('keydown',e=>{if(e.key==='Enter')checkPractice();}); }
-  $('#pa-hint').onclick=()=>{$('#pa-result').innerHTML=`💡 ${esc(p.hint)}`; $('#pa-result').style.color='var(--ink2)';};
-  $('#pa-answer').onclick=()=>{$('#pa-result').innerHTML=`答案：<b>${esc(p.a)}</b>`; $('#pa-result').style.color='var(--good)';};
-  $('#pa-next').onclick=()=>newPractice(typeId);
+  $('#sheet-close').onclick = closeSheet;
+  $('#sheet-steps').onclick = ()=>{ showSteps=!showSteps; renderSheet(); };
+  $('#sheet-ans').onclick = ()=>{ showAns=!showAns; renderSheet(); };
+  $('#sheet-next').onclick = ()=>{
+    if(curIdx===-1) curIdx=0;
+    else if(curIdx+1<t.variants.length) curIdx++;
+    else curIdx=-1;
+    showSteps=false; showAns=false; renderSheet();
+  };
+  area.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ curIdx=Number(b.dataset.v); showSteps=false; showAns=false; renderSheet(); });
 }
-function checkPractice(){
-  const { p } = curPractice;
-  const input = $('#pa-input').value.trim();
-  if(!input){ toast('先输入答案'); return; }
-  const ok = normAns(input)===normAns(String(p.num!==undefined?p.num:p.a));
-  $('#pa-result').innerHTML = ok? '✅ 答对了，真棒！' : '❌ 再看看，可点「提示」或「看答案」';
-  $('#pa-result').style.color = ok?'var(--good)':'var(--bad)';
+
+function closeSheet(){
+  const area = document.getElementById('practice-area');
+  if(area){ area.hidden = true; area.innerHTML = ''; }
+  const wrap = document.getElementById('mistakes-practice');
+  if(wrap) wrap.classList.remove('sheet-mode');
 }
-function normAns(s){
-  return String(s).toLowerCase()
-    .replace(/[xXｘ＝=，,；;、\s]/g,'')
-    .replace(/[{}（）()]/g,'')
-    .replace(/≥|＞|≧/g,'>')
-    .replace(/≤|＜|≦/g,'<')
-    .replace(/或|或者|∪/g,'或')
-    .replace(/且|∩/g,'且');
-}
-$('#btn-practice-random').addEventListener('click', ()=>startPractice(pickOne(Gen.all().map(t=>t.id))));
-function pickOne(a){ return a[Math.floor(Math.random()*a.length)]; }
 
 /* ---- 待复习 ---- */
 function renderReview(){
