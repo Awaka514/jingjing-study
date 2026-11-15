@@ -29,13 +29,14 @@
 
     <div class="card focus-card">
       <div class="focus-top">
-        <div class="card-title">专注</div>
+        <div class="card-title">计时</div>
         <div class="focus-today" id="focus-today">今天 0 分钟</div>
       </div>
+      <div class="focus-picks" id="focus-picks"></div>
       <div class="focus-clock" id="focus-clock">25:00</div>
       <div class="focus-actions">
-        <button class="btn primary" id="focus-toggle">开始专注</button>
-        <button class="btn ghost" id="focus-reset">重置</button>
+        <button class="btn primary" id="focus-toggle" onclick="window.__focusToggle&&window.__focusToggle()">开始</button>
+        <button class="btn ghost" id="focus-reset" onclick="window.__focusReset&&window.__focusReset()">重置</button>
       </div>
     </div>
 
@@ -153,6 +154,14 @@
 
   <!-- ============ 我的 ============ -->
   <section class="page" id="page-me">
+    <div class="card avatar-card">
+      <img id="avatar-img" class="avatar" src="" alt="">
+      <div class="avatar-side">
+        <div class="avatar-name" id="avatar-name">同学</div>
+        <button class="link-btn" id="btn-avatar">换头像 ›</button>
+      </div>
+      <input type="file" id="avatar-file" accept="image/*" hidden>
+    </div>
     <div class="card">
       <div class="card-head"><div class="card-title">个人设置</div></div>
       <label class="field"><span>姓名 / 昵称</span><input id="set-name" placeholder="同学"></label>

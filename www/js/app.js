@@ -147,10 +147,34 @@ function todayBody(s){
 }
 
 
-/* ---- 专注计时 ---- */
+/* ---- 提示音（不用音频文件，现场合成） ---- */
+function beep(times){
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
+    const ctx = beep.ctx || (beep.ctx = new AC());
+    for(let i=0;i<(times||1);i++){
+      const t0 = ctx.currentTime + i*0.55;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type='sine'; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.25, t0+0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0+0.42);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t0); o.stop(t0+0.45);
+    }
+  }catch(e){}
+}
+
+/* ---- 计时（刷卷 / 专注） ---- */
 const Focus = (()=>{
-  const FOCUS_MIN = 25;
-  let left = FOCUS_MIN * 60, timer = null, running = false;
+  const PRESETS = [
+    { id:'cn', name:'语文', min:150 },
+    { id:'math', name:'数学', min:120 },
+    { id:'en', name:'英语', min:120 },
+    { id:'other', name:'小科', min:75 },
+    { id:'free', name:'25 分钟', min:25 },
+  ];
+  let left = 25*60, total = 25*60, timer = null, running = false, cur = 'free';
 
   function todayKey(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
   function todayMins(){
@@ -158,19 +182,45 @@ const Focus = (()=>{
     if(s.focus.day !== todayKey()){ s.focus = { day:todayKey(), mins:0 }; Store.save(); }
     return s.focus.mins || 0;
   }
-  function addMins(n){ const s=S(); s.focus = s.focus || { day:todayKey(), mins:0 }; s.focus.mins = (s.focus.mins||0)+n; s.focus.day = todayKey(); Store.save(); renderFocus(); }
+  function addMins(n){
+    const s=S(); s.focus = s.focus || { day:todayKey(), mins:0 };
+    s.focus.mins = (s.focus.mins||0) + n; s.focus.day = todayKey(); Store.save(); paint();
+  }
   function fmt(sec){ const m=Math.floor(sec/60), s2=sec%60; return String(m).padStart(2,'0')+':'+String(s2).padStart(2,'0'); }
+
   function paint(){
     const c=document.getElementById('focus-clock'), b=document.getElementById('focus-toggle'), t=document.getElementById('focus-today');
     if(!c) return;
     c.textContent = fmt(left);
     c.classList.toggle('running', running);
-    if(b) b.textContent = running ? '暂停' : (left===FOCUS_MIN*60 ? '开始专注' : '继续');
+    c.classList.toggle('low', left <= 60 && left > 0);
+    if(b) b.textContent = running ? '暂停' : (left===total ? '开始' : '继续');
     if(t) t.textContent = `今天 ${todayMins()} 分钟`;
+    const picks = document.getElementById('focus-picks');
+    if(picks && !picks.dataset.bound){
+      picks.dataset.bound='1';
+      picks.innerHTML = PRESETS.map(p=>`<button class="chip ${p.id===cur?'active':''}" data-f="${p.id}">${p.name}${p.id==='free'?'':' '+p.min+'′'}</button>`).join('');
+      picks.querySelectorAll('[data-f]').forEach(el=>el.onclick=()=>setPreset(el.dataset.f));
+    } else if(picks){
+      picks.querySelectorAll('[data-f]').forEach(el=>el.classList.toggle('active', el.dataset.f===cur));
+    }
+  }
+  function setPreset(id){
+    const p = PRESETS.find(x=>x.id===id); if(!p) return;
+    if(timer){ clearInterval(timer); timer=null; } running=false;
+    cur=id; total=p.min*60; left=total; paint();
   }
   function tick(){
     left--;
-    if(left<=0){ clearInterval(timer); timer=null; running=false; left=FOCUS_MIN*60; addMins(FOCUS_MIN); toast('完成一个 25 分钟专注'); try{ navigator.vibrate && navigator.vibrate(200); }catch(e){} }
+    if(left<=0){
+      clearInterval(timer); timer=null; running=false;
+      addMins(Math.round(total/60));
+      left=total;
+      try{ navigator.vibrate && navigator.vibrate([200,120,200]); }catch(e){}
+      beep(3);
+      toast('时间到！'); 
+      paint(); return;
+    }
     paint();
   }
   function toggle(){
@@ -178,81 +228,54 @@ const Focus = (()=>{
     else { running=true; timer=setInterval(tick,1000); }
     paint();
   }
-  function reset(){ if(timer){clearInterval(timer);timer=null;} running=false; left=FOCUS_MIN*60; paint(); }
+  function reset(){ if(timer){clearInterval(timer);timer=null;} running=false; left=total; paint(); }
   function renderFocus(){
     paint();
+    window.__focusToggle = toggle;
+    window.__focusReset = reset;
     const b=document.getElementById('focus-toggle');
-    if(b && !b.dataset.bound){ b.dataset.bound='1'; b.onclick=toggle;
-      const r=document.getElementById('focus-reset'); if(r) r.onclick=reset; }
+    if(b && !b.dataset.bound){ b.dataset.bound='1'; b.onclick=toggle; }
+    const r=document.getElementById('focus-reset');
+    if(r && !r.dataset.bound){ r.dataset.bound='1'; r.onclick=reset; }
   }
   return { renderFocus };
 })();
 
-
-async function exportBackup(){
-  const blob = Store.exportJSON();
-  const stamp = new Date().toISOString().slice(0,10);
-  const name = `鲸鲸学习-备份-${stamp}.json`;
-  const isNative0 = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  if(isNative0){
-    try{
-      const text = await blob.text();
-      const FS = window.Capacitor.Plugins.Filesystem;
-      const Share = window.Capacitor.Plugins.Share;
-      const res = await FS.writeFile({ path: name, data: text, directory: 'CACHE', encoding: 'utf8' });
-      if(Share) await Share.share({ title:'鲸鲸学习备份', files:[res.uri] });
-      markBackedUp(); return;
-    }catch(e){
-      try{ openBackupSheet(blob, name); }catch(_){}
-      return;
-    }
+/* ---- 头像 ---- */
+function renderAvatar(){
+  const s=S();
+  const img=document.getElementById('avatar-img');
+  const nm=document.getElementById('avatar-name');
+  if(nm) nm.textContent = s.profile.name || '同学';
+  if(img){
+    if(s.profile.avatar) img.src = s.profile.avatar;
+    else img.src = 'assets/fatfish.png';
   }
-  try{
-    const file = new File([blob], name, { type:'application/json' });
-    if(navigator.canShare && navigator.canShare({ files:[file] })){
-      await navigator.share({ files:[file], title:'鲸鲸学习备份', text:'保存到文件或发给自己' });
-      markBackedUp(); return;
-    }
-  }catch(e){ /* 落到下面的兜底 */ }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 4000);
-  markBackedUp();
-  // 兜底：App 的 WebView 里点击下载可能被拦，给一个手动保存的窗口
-  const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  if(isNative) openBackupSheet(blob, name);
 }
-function markBackedUp(){
-  try{ localStorage.setItem('jj-last-backup', String(Date.now())); }catch(e){}
-  renderBackupHint();
-}
-async function openBackupSheet(blob, name){
-  let text=''; try{ text = await blob.text(); }catch(e){}
-  openModal('备份数据', `
-    <p class="muted">如果点「导出备份」没有反应（App 里的下载被拦），可以复制下面的内容，存到备忘录或发给自己。</p>
-    <textarea id="bk-text" style="width:100%;height:180px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:10px;font-size:11px;font-family:monospace" readonly>${esc(text)}</textarea>
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn" id="bk-copy" style="flex:1">复制内容</button>
-      <button class="btn primary" id="bk-share" style="flex:1">分享文件</button>
-    </div>
-    <div class="muted" style="margin-top:10px;font-size:11.5px">文件名：${esc(name)}</div>`);
-  const copy = document.getElementById('bk-copy');
-  if(copy) copy.onclick = async ()=>{
-    try{
-      if(navigator.clipboard) await navigator.clipboard.writeText(text);
-      else { const ta=document.getElementById('bk-text'); ta.select(); document.execCommand('copy'); }
-      toast('已复制');
-    }catch(e){ toast('复制失败，可以长按手动全选'); }
+function pickAvatar(){
+  const input=document.getElementById('avatar-file');
+  if(!input) return;
+  input.value='';
+  input.onchange = e=>{
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const rd = new FileReader();
+    rd.onload = ()=>{
+      const i = new Image();
+      i.onload = ()=>{
+        const size=256;
+        const cv=document.createElement('canvas'); cv.width=size; cv.height=size;
+        const ctx=cv.getContext('2d');
+        const scale=Math.max(size/i.width, size/i.height);
+        const w=i.width*scale, h=i.height*scale;
+        ctx.drawImage(i,(size-w)/2,(size-h)/2,w,h);
+        const data=cv.toDataURL('image/jpeg',0.82);
+        const st=S(); st.profile.avatar=data; Store.save(); renderAvatar(); toast('头像已更新');
+      };
+      i.src = rd.result;
+    };
+    rd.readAsDataURL(f);
   };
-  const sh = document.getElementById('bk-share');
-  if(sh) sh.onclick = async ()=>{
-    try{
-      const f = new File([blob], name, { type:'application/json' });
-      await navigator.share({ files:[f], title:'鲸鲸学习备份' });
-    }catch(e){ toast('这个环境不支持分享文件'); }
-  };
+  input.click();
 }
 
 /* ================= 成绩 ================= */
@@ -799,6 +822,8 @@ function renderSubjectManage(){
 
 /* ================= 事件绑定（一次性） ================= */
 function bind(){
+  const ba=document.getElementById('btn-avatar');
+  if(ba) ba.onclick=pickAvatar;
   // 底部导航
   $$('#tabbar .tab').forEach(t=>t.onclick=()=>go(t.dataset.page));
   // 首页卡片跳转
@@ -842,7 +867,7 @@ function bind(){
 }
 function renderAll(){
   renderBackupHint();
-  try{ Focus.renderFocus(); }catch(e){} render('home'); render('scores'); render('mistakes'); render('analysis'); render('me'); }
+  try{ Focus.renderFocus(); }catch(e){} try{ renderAvatar(); }catch(e){} render('home'); render('scores'); render('mistakes'); render('analysis'); render('me'); }
 
 /* ---- 示例数据 ---- */
 function loadDemo(){
