@@ -137,6 +137,8 @@ function renderHome(){
   $('#btn-theme').textContent = s.settings.theme==='dark'?'☀':'☾';
 }
 function todayBody(s){
+  try{ if(Plan.renderHome()) return document.getElementById('home-today-body').innerHTML; }catch(e){}
+
   const due = s.mistakes.filter(Gen.dueToday);
   if(!s.mistakes.length) return `<div class="today-empty"><img src="assets/fish_proud.png" alt=""><div>还没有错题<br><span>记一道，这里就会告诉你今天该看什么</span></div></div>`;
   if(!due.length) return `<div class="today-empty"><img src="assets/fatfish.png" alt=""><div>今天没有到期的错题<br><span>新订正的会按遗忘曲线排期</span></div></div>`;
@@ -647,6 +649,7 @@ function renderAnalysis(){
   const s = S();
   // 提分点
   const points = buildGainPoints(s);
+  try{ Plan.renderKnowMap(); Plan.renderWeekly(); }catch(e){}
   $('#gain-points').innerHTML = points.length? points.map((p,i)=>`
     <div class="gain-item">
       <div class="gain-rank ${i===0?'r':i<3?'g':''}">${i+1}</div>

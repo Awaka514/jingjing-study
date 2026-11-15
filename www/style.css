@@ -676,3 +676,28 @@ html[data-theme="dark"] .hero-whale{opacity:.18}
 .goal-gap{font-size:12.5px;color:var(--ink2);font-weight:600}
 .goal-gap b{color:var(--accent)}
 .goal-empty .goal-gap{margin-top:6px}
+
+/* 复习计划 */
+.plan-head{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--ink2);font-weight:650;margin-bottom:8px}
+.plan-head b{color:var(--accent);font-size:15px}
+.plan-list{display:flex;flex-direction:column;gap:6px;margin:6px 0 4px}
+.plan-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink)}
+.plan-row.type{color:var(--ink3)}
+.plan-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+.plan-row.type .plan-dot{background:var(--ink3)}
+.plan-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 知识点地图 */
+.know-row{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--line2);cursor:pointer}
+.know-row:last-child{border-bottom:none}
+.know-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.know-dot.bad{background:#ef4444}.know-dot.warn{background:#f59e0b}.know-dot.ok{background:#22c55e}
+.know-name{font-size:13.5px;font-weight:650;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.know-meta{font-size:11.5px;color:var(--ink3);font-weight:600}
+
+/* 周报 */
+.weekly-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.weekly-grid>div{display:flex;flex-direction:column;gap:3px}
+.w-num{font-size:19px;font-weight:800;letter-spacing:-.02em}
+.w-label{font-size:10.5px;color:var(--ink3);font-weight:650}
+.weekly-trend{margin-top:10px;font-size:12px;color:var(--ink2);font-weight:600}
