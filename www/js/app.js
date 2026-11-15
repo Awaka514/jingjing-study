@@ -188,6 +188,73 @@ const Focus = (()=>{
   return { renderFocus };
 })();
 
+
+async function exportBackup(){
+  const blob = Store.exportJSON();
+  const stamp = new Date().toISOString().slice(0,10);
+  const name = `鲸鲸学习-备份-${stamp}.json`;
+  const isNative0 = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if(isNative0){
+    try{
+      const text = await blob.text();
+      const FS = window.Capacitor.Plugins.Filesystem;
+      const Share = window.Capacitor.Plugins.Share;
+      const res = await FS.writeFile({ path: name, data: text, directory: 'CACHE', encoding: 'utf8' });
+      if(Share) await Share.share({ title:'鲸鲸学习备份', files:[res.uri] });
+      markBackedUp(); return;
+    }catch(e){
+      try{ openBackupSheet(blob, name); }catch(_){}
+      return;
+    }
+  }
+  try{
+    const file = new File([blob], name, { type:'application/json' });
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ files:[file], title:'鲸鲸学习备份', text:'保存到文件或发给自己' });
+      markBackedUp(); return;
+    }
+  }catch(e){ /* 落到下面的兜底 */ }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  markBackedUp();
+  // 兜底：App 的 WebView 里点击下载可能被拦，给一个手动保存的窗口
+  const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if(isNative) openBackupSheet(blob, name);
+}
+function markBackedUp(){
+  try{ localStorage.setItem('jj-last-backup', String(Date.now())); }catch(e){}
+  renderBackupHint();
+}
+async function openBackupSheet(blob, name){
+  let text=''; try{ text = await blob.text(); }catch(e){}
+  openModal('备份数据', `
+    <p class="muted">如果点「导出备份」没有反应（App 里的下载被拦），可以复制下面的内容，存到备忘录或发给自己。</p>
+    <textarea id="bk-text" style="width:100%;height:180px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:10px;font-size:11px;font-family:monospace" readonly>${esc(text)}</textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn" id="bk-copy" style="flex:1">复制内容</button>
+      <button class="btn primary" id="bk-share" style="flex:1">分享文件</button>
+    </div>
+    <div class="muted" style="margin-top:10px;font-size:11.5px">文件名：${esc(name)}</div>`);
+  const copy = document.getElementById('bk-copy');
+  if(copy) copy.onclick = async ()=>{
+    try{
+      if(navigator.clipboard) await navigator.clipboard.writeText(text);
+      else { const ta=document.getElementById('bk-text'); ta.select(); document.execCommand('copy'); }
+      toast('已复制');
+    }catch(e){ toast('复制失败，可以长按手动全选'); }
+  };
+  const sh = document.getElementById('bk-share');
+  if(sh) sh.onclick = async ()=>{
+    try{
+      const f = new File([blob], name, { type:'application/json' });
+      await navigator.share({ files:[f], title:'鲸鲸学习备份' });
+    }catch(e){ toast('这个环境不支持分享文件'); }
+  };
+}
+
 /* ================= 成绩 ================= */
 function examTotal(e){
   const s = S();
@@ -760,9 +827,7 @@ function bind(){
     Store.save(); renderMe(); toast('已添加 '+name.trim());
   };
   $('#btn-export').onclick = ()=>{
-    const blob = Store.exportJSON(); const url=URL.createObjectURL(blob);
-    const a=document.createElement('a'); a.href=url; a.download='学习数据备份.json'; a.click(); URL.revokeObjectURL(url);
-    try{ localStorage.setItem('jj-last-backup', String(Date.now())); renderBackupHint(); }catch(e){}
+    exportBackup();
   };
   $('#btn-import').onclick = ()=>$('#import-file').click();
   $('#import-file').onchange = e=>{
