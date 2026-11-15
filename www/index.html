@@ -12,7 +12,7 @@
 <body>
 <header id="topbar">
   <div class="tb-title" id="tb-title">首页</div>
-  <div class="tb-actions" id="tb-actions"></div>
+  <div class="tb-actions" id="tb-actions"><button class="icon-btn" id="btn-theme" aria-label="切换主题">☾</button></div>
 </header>
 
 <main id="pages">
@@ -21,10 +21,22 @@
     <div class="hero">
       <div class="hero-top">
         <div class="hero-greet" id="home-greet">Hi，同学</div>
-        <button class="icon-btn" id="btn-theme" aria-label="切换主题">☾</button>
       </div>
       <div class="hero-count" id="home-countdown">设置下次考试后显示倒计时</div>
+      <img class="hero-whale" src="assets/fatfish.png" alt="">
       <div class="hero-chips" id="home-chips"></div>
+    </div>
+
+    <div class="card focus-card">
+      <div class="focus-top">
+        <div class="card-title">专注</div>
+        <div class="focus-today" id="focus-today">今天 0 分钟</div>
+      </div>
+      <div class="focus-clock" id="focus-clock">25:00</div>
+      <div class="focus-actions">
+        <button class="btn primary" id="focus-toggle">开始专注</button>
+        <button class="btn ghost" id="focus-reset">重置</button>
+      </div>
     </div>
 
     <div class="card" id="home-today">
@@ -48,7 +60,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="home-trend-card">
       <div class="card-head"><div class="card-title">成绩走势</div><button class="link-btn" data-nav="scores">详情 ›</button></div>
       <div class="chart-box" id="home-chart"></div>
     </div>
@@ -63,6 +75,7 @@
       <button class="seg-btn" data-v="list">考试记录</button>
     </div>
     <div class="subpage active" id="scores-overview">
+      <div id="scores-goal"></div>
       <div class="card">
         <div class="card-head"><div class="card-title">总分 / 排名曲线</div></div>
         <div class="chart-box" id="scores-total-chart"></div>
@@ -147,6 +160,7 @@
     </div>
     <div class="card">
       <div class="card-head"><div class="card-title">数据</div></div>
+      <div class="backup-hint" id="backup-hint">还没备份过</div>
       <button class="btn ghost block" id="btn-export">导出备份 (JSON)</button>
       <button class="btn ghost block" id="btn-import">导入备份</button>
       <input type="file" id="import-file" accept="application/json" hidden>
@@ -158,11 +172,11 @@
 </main>
 
 <nav id="tabbar">
-  <button class="tab active" data-page="home"><span class="tab-ic">⌂</span><span>首页</span></button>
-  <button class="tab" data-page="scores"><span class="tab-ic">▥</span><span>成绩</span></button>
-  <button class="tab" data-page="mistakes"><span class="tab-ic">✎</span><span>错题</span></button>
-  <button class="tab" data-page="analysis"><span class="tab-ic">◈</span><span>分析</span></button>
-  <button class="tab" data-page="me"><span class="tab-ic">☺</span><span>我的</span></button>
+  <button class="tab active" data-page="home"><span class="tab-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg></span><span>首页</span></button>
+  <button class="tab" data-page="scores"><span class="tab-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V9M12 19V5M19 19v-7"/></svg></span><span>成绩</span></button>
+  <button class="tab" data-page="mistakes"><span class="tab-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h9L20 9.5V19a1 1 0 0 1-1 1H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M14 4v6h6"/><path d="M8.5 14.5h7"/></svg></span><span>错题</span></button>
+  <button class="tab" data-page="analysis"><span class="tab-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5 9 11l3.5 3.5L20 7"/><path d="M20 11V7h-4"/></svg></span><span>分析</span></button>
+  <button class="tab" data-page="me"><span class="tab-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c0-3.3 3.1-5.5 7-5.5s7 2.2 7 5.5"/></svg></span><span>我的</span></button>
 </nav>
 
 <div id="modal-root" hidden>

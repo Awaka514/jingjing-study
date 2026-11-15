@@ -20,7 +20,7 @@ function go(page){
   $$('#tabbar .tab').forEach(t=>t.classList.toggle('active', t.dataset.page===page));
   $('#tb-title').textContent = TITLES[page];
   const act = $('#tb-actions'); act.innerHTML='';
-  if(page==='home'){ act.innerHTML = '<button class="icon-btn" id="btn-theme2">☾</button>'; $('#btn-theme2').onclick=toggleTheme; }
+
   if(page==='scores'){ act.innerHTML = '<button class="icon-btn" id="btn-add-exam-top">＋</button>'; $('#btn-add-exam-top').onclick=()=>openExamModal(); }
   if(page==='mistakes'){ act.innerHTML = '<button class="icon-btn" id="btn-add-mistake-top">＋</button>'; $('#btn-add-mistake-top').onclick=()=>openMistakeModal(); }
   render(page);
@@ -94,9 +94,11 @@ function renderHome(){
     else if(days===0) cd = `<div class="cd-num">今天</div><div class="cd-sub">${esc(name)}，加油</div>`;
     else cd = `<div class="cd-num">已结束</div><div class="cd-sub">${esc(name)}</div>`;
   } else {
-    cd = `<div class="cd-num dim">未设置</div><div class="cd-sub">去「我的」填下次考试，这里显示倒计时</div>`;
+    cd = `<div class="cd-num dim">还没有考试</div><div class="cd-sub">填上日期，这里就变成倒计时</div>
+      <button class="btn primary sm hero-cta" id="hero-set-exam">设置考试日期</button>`;
   }
   $('#home-countdown').innerHTML = cd;
+  const he = $('#hero-set-exam'); if(he) he.onclick = ()=>go('me');
   // chips
   const dueCount = s.mistakes.filter(Gen.dueToday).length;
   const chips = [
@@ -136,11 +138,53 @@ function renderHome(){
 }
 function todayBody(s){
   const due = s.mistakes.filter(Gen.dueToday);
-  if(!s.mistakes.length) return '<div class="empty" style="padding:20px"><div class="big">🎯</div>还没有错题，记录第一道错题开始进步吧</div>';
-  if(!due.length) return '<div class="empty" style="padding:16px"><div class="big">🎉</div>今天没有待复习的错题，太棒了</div>';
+  if(!s.mistakes.length) return `<div class="today-empty"><img src="assets/fish_proud.png" alt=""><div>还没有错题<br><span>记一道，这里就会告诉你今天该看什么</span></div></div>`;
+  if(!due.length) return `<div class="today-empty"><img src="assets/fatfish.png" alt=""><div>今天没有到期的错题<br><span>新订正的会按遗忘曲线排期</span></div></div>`;
   return `<div style="font-size:14px">有 <b style="color:var(--accent)">${due.length}</b> 道错题到了复习时间点，巩固记忆效果最好。</div>
     <button class="btn primary block" style="margin-top:10px" onclick="go('mistakes');switchSeg('mistakes','review')">开始复习 ›</button>`;
 }
+
+
+/* ---- 专注计时 ---- */
+const Focus = (()=>{
+  const FOCUS_MIN = 25;
+  let left = FOCUS_MIN * 60, timer = null, running = false;
+
+  function todayKey(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+  function todayMins(){
+    const s=S(); s.focus = s.focus || { day:todayKey(), mins:0 };
+    if(s.focus.day !== todayKey()){ s.focus = { day:todayKey(), mins:0 }; Store.save(); }
+    return s.focus.mins || 0;
+  }
+  function addMins(n){ const s=S(); s.focus = s.focus || { day:todayKey(), mins:0 }; s.focus.mins = (s.focus.mins||0)+n; s.focus.day = todayKey(); Store.save(); renderFocus(); }
+  function fmt(sec){ const m=Math.floor(sec/60), s2=sec%60; return String(m).padStart(2,'0')+':'+String(s2).padStart(2,'0'); }
+  function paint(){
+    const c=document.getElementById('focus-clock'), b=document.getElementById('focus-toggle'), t=document.getElementById('focus-today');
+    if(!c) return;
+    c.textContent = fmt(left);
+    c.classList.toggle('running', running);
+    if(b) b.textContent = running ? '暂停' : (left===FOCUS_MIN*60 ? '开始专注' : '继续');
+    if(t) t.textContent = `今天 ${todayMins()} 分钟`;
+  }
+  function tick(){
+    left--;
+    if(left<=0){ clearInterval(timer); timer=null; running=false; left=FOCUS_MIN*60; addMins(FOCUS_MIN); toast('完成一个 25 分钟专注'); try{ navigator.vibrate && navigator.vibrate(200); }catch(e){} }
+    paint();
+  }
+  function toggle(){
+    if(running){ clearInterval(timer); timer=null; running=false; }
+    else { running=true; timer=setInterval(tick,1000); }
+    paint();
+  }
+  function reset(){ if(timer){clearInterval(timer);timer=null;} running=false; left=FOCUS_MIN*60; paint(); }
+  function renderFocus(){
+    paint();
+    const b=document.getElementById('focus-toggle');
+    if(b && !b.dataset.bound){ b.dataset.bound='1'; b.onclick=toggle;
+      const r=document.getElementById('focus-reset'); if(r) r.onclick=reset; }
+  }
+  return { renderFocus };
+})();
 
 /* ================= 成绩 ================= */
 function examTotal(e){
@@ -195,6 +239,27 @@ function renderScoresOverview(){
     {name:'总分', color:'var(--accent)', points:totalPts},
     {name:'班级排名', color:'var(--warn)', points:rankPts.length?rankPts:[]},
   ], labels, unit:'' });
+  // 目标对比
+  const goal = $('#scores-goal');
+  if(goal){
+    const target = Number(s.profile.targetTotal)||0;
+    const last = exs.length ? examTotal(exs[exs.length-1]) : null;
+    if(target>0 && last && last.total>0){
+      const gap = target - last.total;
+      const pct = Math.max(0, Math.min(100, Math.round(last.total/target*100)));
+      goal.innerHTML = `<div class="card goal-card">
+        <div class="goal-row"><div><div class="goal-label">目标总分</div><div class="goal-num">${target}</div></div>
+        <div class="goal-right"><div class="goal-label">最近一次</div><div class="goal-last">${last.total}</div></div></div>
+        <div class="goal-bar"><span style="width:${pct}%"></span></div>
+        <div class="goal-gap">${gap>0?`还差 <b>${gap}</b> 分`:`已超出目标 <b>${-gap}</b> 分`}</div>
+      </div>`;
+    } else {
+      goal.innerHTML = `<div class="card goal-card goal-empty">
+        <div class="goal-label">目标总分</div>
+        <div class="goal-gap">在「我的」里填目标总分，这里会显示还差多少</div>
+      </div>`;
+    }
+  }
   // 科目选择
   const pick = $('#scores-subject-pick');
   const cur = pick.dataset.cur || s.subjects[0]?.id;
@@ -217,7 +282,7 @@ function renderScoresOverview(){
 function renderScoresList(){
   const s = S();
   const exs = [...s.exams].sort((a,b)=>b.date.localeCompare(a.date));
-  if(!exs.length){ $('#exam-list').innerHTML = '<div class="empty"><div class="big">📝</div>还没有考试记录<br>点上方按钮，导入一次成绩或答题卡</div>'; return; }
+  if(!exs.length){ $('#exam-list').innerHTML = '<div class="empty"><img class="empty-whale" src="assets/fish_face.png" alt="">还没有考试记录<br>点上方按钮，导入一次成绩或答题卡</div>'; return; }
   $('#exam-list').innerHTML = exs.map(e=>examItemHTML(e)).join('');
   $('#exam-list').querySelectorAll('[data-act]').forEach(el=>{
     el.onclick = ()=>{ const id=el.dataset.id, act=el.dataset.act; if(act==='edit') openExamModal(s.exams.find(x=>x.id===id)); if(act==='del') delExam(id); };
@@ -316,7 +381,7 @@ function renderMistakeBook(){
   f.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ f.dataset.cur=c.dataset.id; renderMistakeBook(); });
   let list = [...s.mistakes].sort((a,b)=>(b.created||0)-(a.created||0));
   if(cur!=='all') list = list.filter(m=>m.subjectId===cur);
-  if(!list.length){ $('#mistake-list').innerHTML = '<div class="empty"><div class="big">✏️</div>还没有错题<br>点右下角 ＋，拍下题目或手动录入</div>'; return; }
+  if(!list.length){ $('#mistake-list').innerHTML = '<div class="empty"><img class="empty-whale" src="assets/fish_think.png" alt="">还没有错题<br>点右下角 ＋，拍下题目或手动录入</div>'; return; }
   $('#mistake-list').innerHTML = list.map(m=>mistakeHTML(m)).join('');
   $('#mistake-list').querySelectorAll('[data-act]').forEach(el=>{
     el.onclick = ()=>{ const id=el.dataset.id, act=el.dataset.act;
@@ -447,7 +512,7 @@ function renderPractice(){
             <div class="type-card-top"><span class="type-name">${esc(t.title)}</span><span class="level">${'★'.repeat(t.level)}</span></div>
             <div class="type-topic">${esc(t.topic)}</div>
             <div class="type-why">${esc(t.why)}</div>
-            <div class="type-hit ${hit?'':'dim'}">${hit?`你的错题命中 ${hit.items.length} 道`:'含 2 道变式'}${practicedOf(t.id)?` · 练过 ${practicedOf(t.id)} 次`:''}</div>
+            <div class="type-hit ${hit?'':'dim'}">${hit?`你的错题命中 ${hit.items.length} 道`:'含 2 道变式'}${rateText(t.id)}</div>
           </div>
         </button>`;
       }).join('')}
@@ -456,7 +521,29 @@ function renderPractice(){
   hero.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openType(b.dataset.open));
 }
 
+function renderBackupHint(){
+  const el = document.getElementById('backup-hint'); if(!el) return;
+  let ts = 0; try{ ts = Number(localStorage.getItem('jj-last-backup')||0); }catch(e){}
+  if(!ts){ el.textContent = '还没备份过。重装或换手机，数据会没。'; el.className='backup-hint warn'; return; }
+  const days = Math.floor((Date.now()-ts)/86400000);
+  el.textContent = days<=0 ? '今天已备份' : `上次备份：${days} 天前`;
+  el.className = 'backup-hint' + (days>=7?' warn':'');
+}
+function rateText(id){
+  const st = statsOf(id); if(!st || (!st.ok && !st.bad)) return '';
+  const total = (st.ok||0)+(st.bad||0);
+  const pct = Math.round((st.ok||0)/total*100);
+  return ` · 做过 ${total} 次，对 ${pct}%`;
+}
 function practicedOf(id){ const s=S(); return (s.practice && s.practice[id]) || 0; }
+function statsOf(id){ const s=S(); return (s.pstats && s.pstats[id]) || null; }
+function markPractice(id, ok){
+  const s=S(); s.pstats = s.pstats || {};
+  const r = s.pstats[id] || { ok:0, bad:0, last:0 };
+  ok ? (r.ok = (r.ok||0)+1) : (r.bad = (r.bad||0)+1);
+  r.last = Date.now();
+  s.pstats[id] = r; Store.save();
+}
 function bumpPractice(id){
   const s = S(); s.practice = s.practice || {};
   s.practice[id] = (s.practice[id]||0) + 1; Store.save();
@@ -499,6 +586,13 @@ function renderSheet(){
     <div class="variant-row">
       <button class="chip ${curIdx===-1?'active':''}" data-v="-1">原题</button>
       ${t.variants.map((v,i)=>`<button class="chip ${curIdx===i?'active':''}" data-v="${i}">变式${i+1}</button>`).join('')}
+    </div>
+    <div class="sheet-judge">
+      <div class="judge-label">做完了，对一下</div>
+      <div class="judge-row">
+        <button class="btn sm ok" id="judge-ok">做对了</button>
+        <button class="btn sm bad" id="judge-bad">没做对</button>
+      </div>
     </div>`;
   $('#sheet-close').onclick = closeSheet;
   $('#sheet-steps').onclick = ()=>{ showSteps=!showSteps; renderSheet(); };
@@ -510,6 +604,8 @@ function renderSheet(){
     showSteps=false; showAns=false; renderSheet();
   };
   area.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ curIdx=Number(b.dataset.v); showSteps=false; showAns=false; renderSheet(); });
+  $('#judge-ok').onclick = ()=>{ markPractice(t.id, true); toast('记下了，这类题保持手感'); closeSheet(); renderPractice(); };
+  $('#judge-bad').onclick = ()=>{ markPractice(t.id, false); toast('记下了，回头重点练这一类'); closeSheet(); renderPractice(); };
 }
 
 function closeSheet(){
@@ -523,7 +619,7 @@ function closeSheet(){
 function renderReview(){
   const s = S();
   const due = s.mistakes.filter(Gen.dueToday).sort((a,b)=>(a.nextDue||0)-(b.nextDue||0));
-  if(!due.length){ $('#review-queue').innerHTML='<div class="empty"><div class="big">🌙</div>当前没有到期的错题<br>新订正的错题会按遗忘曲线自动排期</div>'; return; }
+  if(!due.length){ $('#review-queue').innerHTML='<div class="empty"><img class="empty-whale" src="assets/fatfish.png" alt="">今天没有到期的错题<br>订正后会按遗忘曲线自动排期</div>'; return; }
   $('#review-queue').innerHTML = due.map(m=>`
     <div class="mistake-item" id="rv-${m.id}">
       <div><span class="mistake-tag">${esc(subjectName(m.subjectId))}</span>${m.type?`<span class="mistake-tag type">${esc(m.type)}</span>`:''}<span class="mistake-tag" style="background:color-mix(in srgb,var(--ink3) 12%,transparent);color:var(--ink3)">第${m.stage+1}轮</span></div>
@@ -663,6 +759,7 @@ function bind(){
   $('#btn-export').onclick = ()=>{
     const blob = Store.exportJSON(); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download='学习数据备份.json'; a.click(); URL.revokeObjectURL(url);
+    try{ localStorage.setItem('jj-last-backup', String(Date.now())); renderBackupHint(); }catch(e){}
   };
   $('#btn-import').onclick = ()=>$('#import-file').click();
   $('#import-file').onchange = e=>{
@@ -675,7 +772,9 @@ function bind(){
     if(confirm('确定清空全部数据？此操作不可恢复。建议先导出备份。')){ Store.reset(); renderAll(); toast('已清空'); }
   };
 }
-function renderAll(){ render('home'); render('scores'); render('mistakes'); render('analysis'); render('me'); }
+function renderAll(){
+  renderBackupHint();
+  try{ Focus.renderFocus(); }catch(e){} render('home'); render('scores'); render('mistakes'); render('analysis'); render('me'); }
 
 /* ---- 示例数据 ---- */
 function loadDemo(){
