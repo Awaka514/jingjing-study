@@ -7,7 +7,7 @@
 <title>鲸鲸学习 · 成绩与错题助手</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <header id="topbar">
@@ -27,17 +27,18 @@
       <div class="hero-chips" id="home-chips"></div>
     </div>
 
-    <div class="card focus-card">
-      <div class="focus-top">
-        <div class="card-title">计时</div>
-        <div class="focus-today" id="focus-today">今天 0 分钟</div>
+    <div class="card timer-card" id="timer-root">
+      <div class="timer-top"><span class="card-title">计时</span><span class="focus-today" id="timer-mins">今天 0 分钟</span></div>
+      <button class="picker-btn" id="timer-pick" data-t="pick">
+        <span id="timer-pick-name">语文 · 150 分钟</span>
+        <span class="caret">▾</span>
+      </button>
+      <div class="timer-clock" id="timer-clock">150:00</div>
+      <div class="timer-actions">
+        <button class="btn primary" data-t="toggle" id="timer-toggle">开始</button>
+        <button class="btn ghost" data-t="reset" id="timer-reset">重置</button>
       </div>
-      <div class="focus-picks" id="focus-picks"></div>
-      <div class="focus-clock" id="focus-clock">25:00</div>
-      <div class="focus-actions">
-        <button class="btn primary" id="focus-toggle" onclick="window.__focusToggle&&window.__focusToggle()">开始</button>
-        <button class="btn ghost" id="focus-reset" onclick="window.__focusReset&&window.__focusReset()">重置</button>
-      </div>
+      <div class="timer-msg" id="timer-msg"></div>
     </div>
 
     <div class="card" id="home-today">
@@ -203,11 +204,11 @@
 <div id="toast"></div>
 <input type="file" id="photo-input" accept="image/*" hidden>
 
-<script src="js/store.js"></script>
-<script src="js/charts.js"></script>
-<script src="js/types.js"></script>
-<script src="js/gen.js"></script>
-<script src="js/plan.js"></script>
+<script src="js/store.js?v=5"></script>
+<script src="js/charts.js?v=5"></script>
+<script src="js/types.js?v=5"></script>
+<script src="js/gen.js?v=5"></script>
+<script src="js/plan.js?v=5"></script>
 <script src="js/app.js"></script>
 <script>
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(()=>{}); }

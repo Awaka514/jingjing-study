@@ -165,80 +165,92 @@ function beep(times){
   }catch(e){}
 }
 
-/* ---- 计时（刷卷 / 专注） ---- */
-const Focus = (()=>{
+/* ---- 计时：静态面板 + 事件委托 + 定时刷新 ---- */
+const Timer = (()=>{
   const PRESETS = [
     { id:'cn', name:'语文', min:150 },
     { id:'math', name:'数学', min:120 },
     { id:'en', name:'英语', min:120 },
     { id:'other', name:'小科', min:75 },
-    { id:'free', name:'25 分钟', min:25 },
+    { id:'free', name:'25′', min:25 },
   ];
-  let left = 25*60, total = 25*60, timer = null, running = false, cur = 'free';
+  const S0 = { preset:'cn', total:150*60, left:150*60, running:false, timer:null, msg:'' };
 
-  function todayKey(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
-  function todayMins(){
-    const s=S(); s.focus = s.focus || { day:todayKey(), mins:0 };
-    if(s.focus.day !== todayKey()){ s.focus = { day:todayKey(), mins:0 }; Store.save(); }
-    return s.focus.mins || 0;
+  function dayKey(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+  function mins(){
+    const s=S(); s.focus=s.focus||{day:dayKey(),mins:0};
+    if(s.focus.day!==dayKey()){ s.focus={day:dayKey(),mins:0}; Store.save(); }
+    return s.focus.mins||0;
   }
-  function addMins(n){
-    const s=S(); s.focus = s.focus || { day:todayKey(), mins:0 };
-    s.focus.mins = (s.focus.mins||0) + n; s.focus.day = todayKey(); Store.save(); paint();
+  function addMin(n){
+    const s=S(); s.focus=s.focus||{day:dayKey(),mins:0};
+    s.focus.mins=(s.focus.mins||0)+n; s.focus.day=dayKey(); Store.save();
   }
-  function fmt(sec){ const m=Math.floor(sec/60), s2=sec%60; return String(m).padStart(2,'0')+':'+String(s2).padStart(2,'0'); }
+  function fmt(sec){ sec=Math.max(0,sec); return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0'); }
 
   function paint(){
-    const c=document.getElementById('focus-clock'), b=document.getElementById('focus-toggle'), t=document.getElementById('focus-today');
-    if(!c) return;
-    c.textContent = fmt(left);
-    c.classList.toggle('running', running);
-    c.classList.toggle('low', left <= 60 && left > 0);
-    if(b) b.textContent = running ? '暂停' : (left===total ? '开始' : '继续');
-    if(t) t.textContent = `今天 ${todayMins()} 分钟`;
-    const picks = document.getElementById('focus-picks');
-    if(picks && !picks.dataset.bound){
-      picks.dataset.bound='1';
-      picks.innerHTML = PRESETS.map(p=>`<button class="chip ${p.id===cur?'active':''}" data-f="${p.id}">${p.name}${p.id==='free'?'':' '+p.min+'′'}</button>`).join('');
-      picks.querySelectorAll('[data-f]').forEach(el=>el.onclick=()=>setPreset(el.dataset.f));
-    } else if(picks){
-      picks.querySelectorAll('[data-f]').forEach(el=>el.classList.toggle('active', el.dataset.f===cur));
-    }
+    const clock=document.getElementById('timer-clock');
+    if(!clock) return;
+    clock.textContent = fmt(S0.left);
+    clock.classList.toggle('running', S0.running);
+    clock.classList.toggle('low', S0.left<=60);
+    const btn=document.getElementById('timer-toggle');
+    if(btn) btn.textContent = S0.running ? '暂停' : (S0.left===S0.total ? '开始' : '继续');
+    const m=document.getElementById('timer-mins');
+    if(m) m.textContent = `今天 ${mins()} 分钟`;
+    const nm=document.getElementById('timer-pick-name');
+    if(nm){ const p=PRESETS.find(x=>x.id===S0.preset)||PRESETS[0]; nm.textContent = `${p.name} · ${p.min} 分钟`; }
+    const msg=document.getElementById('timer-msg');
+    if(msg) msg.textContent = S0.msg;
+  }
+  function openPresetSheet(){
+    const rows = PRESETS.map(p=>`<button class="pick-row ${p.id===S0.preset?'on':''}" data-t="preset" data-id="${p.id}">
+        <span class="pick-name">${p.name}</span>
+        <span class="pick-min">${p.min} 分钟</span>
+      </button>`).join('');
+    openModal('选择科目', `<div class="pick-list">${rows}</div>`);
   }
   function setPreset(id){
-    const p = PRESETS.find(x=>x.id===id); if(!p) return;
-    if(timer){ clearInterval(timer); timer=null; } running=false;
-    cur=id; total=p.min*60; left=total; paint();
-  }
-  function tick(){
-    left--;
-    if(left<=0){
-      clearInterval(timer); timer=null; running=false;
-      addMins(Math.round(total/60));
-      left=total;
-      try{ navigator.vibrate && navigator.vibrate([200,120,200]); }catch(e){}
-      beep(3);
-      toast('时间到！'); 
-      paint(); return;
-    }
+    const p=PRESETS.find(x=>x.id===id); if(!p) return;
+    if(S0.timer){ clearInterval(S0.timer); S0.timer=null; }
+    S0.preset=id; S0.total=p.min*60; S0.left=S0.total; S0.running=false; S0.msg='';
     paint();
   }
   function toggle(){
-    if(running){ clearInterval(timer); timer=null; running=false; }
-    else { running=true; timer=setInterval(tick,1000); }
+    if(S0.running){
+      clearInterval(S0.timer); S0.timer=null; S0.running=false; S0.msg='已暂停';
+      paint(); return;
+    }
+    S0.running=true; S0.msg='';
+    S0.timer=setInterval(()=>{
+      S0.left--;
+      if(S0.left<=0){
+        clearInterval(S0.timer); S0.timer=null; S0.running=false; S0.left=S0.total;
+        addMin(Math.round(S0.total/60));
+        S0.msg='时间到，站起来活动一下';
+        try{ navigator.vibrate && navigator.vibrate([220,120,220]); }catch(e){}
+        beep(3);
+      }
+      paint();
+    },1000);
     paint();
   }
-  function reset(){ if(timer){clearInterval(timer);timer=null;} running=false; left=total; paint(); }
-  function renderFocus(){
-    paint();
-    window.__focusToggle = toggle;
-    window.__focusReset = reset;
-    const b=document.getElementById('focus-toggle');
-    if(b && !b.dataset.bound){ b.dataset.bound='1'; b.onclick=toggle; }
-    const r=document.getElementById('focus-reset');
-    if(r && !r.dataset.bound){ r.dataset.bound='1'; r.onclick=reset; }
+  function reset(){
+    if(S0.timer){ clearInterval(S0.timer); S0.timer=null; }
+    S0.running=false; S0.left=S0.total; S0.msg=''; paint();
   }
-  return { renderFocus };
+  document.addEventListener('click', function(e){
+    const b = e.target && e.target.closest ? e.target.closest('[data-t]') : null;
+    if(!b) return;
+    const act=b.dataset.t;
+    if(act==='pick') openPresetSheet();
+    else if(act==='preset'){ setPreset(b.dataset.id); try{ closeModal(); }catch(e){} }
+    else if(act==='toggle') toggle();
+    else if(act==='reset') reset();
+  }, true);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', paint); else paint();
+  setInterval(paint, 1000);
+  return { render: paint };
 })();
 
 /* ---- 头像 ---- */
@@ -867,7 +879,7 @@ function bind(){
 }
 function renderAll(){
   renderBackupHint();
-  try{ Focus.renderFocus(); }catch(e){} try{ renderAvatar(); }catch(e){} render('home'); render('scores'); render('mistakes'); render('analysis'); render('me'); }
+  try{ Timer.render(); }catch(e){ const r=document.getElementById('timer-root'); if(r) r.innerHTML='<div class="timer-msg bad">ERR: '+e.message+'</div>'; console.error(e); } try{ renderAvatar(); }catch(e){} render('home'); render('scores'); render('mistakes'); render('analysis'); render('me'); }
 
 /* ---- 示例数据 ---- */
 function loadDemo(){
@@ -906,5 +918,8 @@ function init(){
   Store.get();
   bind();
   go('home');
+  try{ Timer.render(); }catch(e){ const r=document.getElementById('timer-root'); if(r) r.innerHTML='<div class="timer-msg bad">ERR: '+e.message+'</div>'; }
+  try{ renderAvatar(); }catch(e){}
+  try{ Plan.renderKnowMap && Plan.renderKnowMap(); }catch(e){}
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
