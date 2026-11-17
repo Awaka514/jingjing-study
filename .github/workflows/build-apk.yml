@@ -37,6 +37,18 @@ jobs:
             "$SDKM" "platforms;android-34" "build-tools;34.0.0" || true
           fi
 
+      - name: Restore signing keystore
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.p12"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "用仓库固定密钥签名"
+          else
+            echo "没有配置签名密钥，退回默认调试签名"
+          fi
+
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
