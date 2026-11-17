@@ -38,6 +38,7 @@ const Store = (() => {
       ],
       exams: [],      // {id, name, date, entries:{[subjId]:{score,full,avg,classRank,gradeRank}}, photos:[fileId], note}
       mistakes: [],   // {id, subjectId, examId, type, knowledge, question, photoId, wrong, right, analysis, created, stage, nextDue, done}
+      patches: [],    // 卡点急救包 {id, trigger, bug, patch, created, hits}
       targets: {},    // subjectId -> score
       settings: { theme:'light' }
     };
@@ -56,6 +57,7 @@ const Store = (() => {
       state.profile = Object.assign({}, d.profile, state.profile||{});
       state.settings = Object.assign({}, d.settings, state.settings||{});
       if(!state.subjects || !state.subjects.length) state.subjects = d.subjects;
+      if(!Array.isArray(state.patches)) state.patches = [];
     }catch(e){ state = defaults(); }
     applyTheme(state.settings.theme);
     return state;
