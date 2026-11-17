@@ -1,4 +1,4 @@
-const CACHE = 'jingjing-v4';
+const CACHE = 'jingjing-v5';
 const ASSETS = [
   './', './index.html', './style.css', './manifest.json', './icon.svg',
   './icon-192.png', './icon-512.png',
