@@ -471,9 +471,86 @@ function renderMistakes(){
   const seg = $('#mistakes-seg'); if(!seg.dataset.bound){
     seg.dataset.bound=1; seg.onclick=e=>{ const b=e.target.closest('.seg-btn'); if(b) switchSeg('mistakes', b.dataset.v); };
   }
-  renderMistakeBook(); renderPractice(); renderReview();
+  renderMistakeBook(); renderPractice(); renderReview(); renderPatch();
   const due = s.mistakes.filter(Gen.dueToday).length;
   $('#review-dot').hidden = due===0;
+}
+
+/* ================= 卡点急救包 ================= */
+function renderPatch(){
+  const s = S();
+  const box = $('#patch-list'); if(!box) return;
+  const list = [...(s.patches||[])].sort((a,b)=>(b.created||0)-(a.created||0));
+  const cnt = $('#patch-count');
+  if(cnt) cnt.textContent = list.length ? ' 共 ' + list.length + ' 条' : '';
+  const add = $('#btn-add-patch');
+  if(add && !add.dataset.bound){ add.dataset.bound = 1; add.onclick = openPatchModal; }
+  if(!list.length){
+    box.innerHTML = '<div class="empty"><img class="empty-whale" src="assets/fish_think.png" alt="">还没有卡点<br>点右下角 ＋，记一条「卡在哪、怎么过」</div>';
+    return;
+  }
+  box.innerHTML = list.map(p=>`
+    <button class="patch-row" data-id="${p.id}">
+      <span class="patch-line"><span class="patch-trigger">${esc(p.trigger||'场景')}</span><span class="patch-bug">${esc(p.bug||'')}</span></span>
+      <span class="patch-fix">→ ${esc(p.patch||'')}</span>
+      ${p.hits?`<span class="patch-hits">${p.hits}</span>`:''}
+    </button>`).join('');
+  box.querySelectorAll('.patch-row').forEach(el=>el.onclick=()=>openPatchCard(el.dataset.id));
+}
+
+function openPatchCard(id){
+  const s = S();
+  const p = (s.patches||[]).find(x=>x.id===id); if(!p) return;
+  openModal('卡点', `
+    <div class="fc">
+      <div class="fc-trigger">${esc(p.trigger||'场景未填')}</div>
+      <div class="fc-bug">${esc(p.bug||'')}</div>
+      <div class="fc-fix" id="fc-fix" hidden><span>补丁</span>${esc(p.patch||'')}</div>
+    </div>
+    <div class="fc-actions">
+      <button class="btn primary block" id="fc-show">看补丁</button>
+    </div>
+    <button class="link-btn danger" id="fc-del" style="margin-top:12px">删除这条</button>`);
+  const showBtn = $('#fc-show');
+  $('#fc-show').onclick = ()=>{
+    $('#fc-fix').hidden = false;
+    showBtn.textContent = '记住了，下一条';
+    showBtn.onclick = ()=>{ p.hits = (p.hits||0)+1; Store.save(); renderPatch(); closeModal(); openNextPatch(p.id); };
+  };
+  $('#fc-del').onclick = ()=>{
+    s.patches = (s.patches||[]).filter(x=>x.id!==p.id);
+    Store.save(); renderPatch(); closeModal(); toast('已删除');
+  };
+}
+
+function openNextPatch(afterId){
+  const list = [...(S().patches||[])].sort((a,b)=>(b.created||0)-(a.created||0));
+  if(!list.length) return;
+  const i = list.findIndex(x=>x.id===afterId);
+  const next = list[(i+1) % list.length];
+  if(next && next.id!==afterId) openPatchCard(next.id);
+}
+
+function openPatchModal(){
+  openModal('记一个卡点', `
+    <label class="field"><span>什么题型</span><input id="p-trigger" placeholder="如：对数换底、已知表示未知"></label>
+    <label class="field"><span>卡在哪</span><input id="p-bug" placeholder="如：卡在 lg5 不知道怎么办"></label>
+    <label class="field"><span>临门一脚</span><input id="p-patch" placeholder="如：lg5 立刻换成 1−lg2"></label>
+    <button class="btn primary block" id="p-save" style="margin-top:6px">存下这一脚</button>`);
+  setTimeout(()=>$('#p-trigger')?.focus(), 60);
+  $('#p-save').onclick = ()=>{
+    const data = {
+      id: Store.uid(),
+      trigger: $('#p-trigger').value.trim(),
+      bug: $('#p-bug').value.trim(),
+      patch: $('#p-patch').value.trim(),
+      created: Date.now(),
+      hits: 0
+    };
+    if(!data.bug && !data.patch){ toast('至少写下卡在哪'); return; }
+    const s = S(); s.patches = s.patches || []; s.patches.push(data); Store.save();
+    closeModal(); renderPatch(); switchSeg('mistakes','patch'); toast('已存进急救包');
+  };
 }
 function renderMistakeBook(){
   const s = S();
